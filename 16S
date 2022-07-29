@@ -1,0 +1,98 @@
+ACTIVATE QIIME 
+$ conda activate qiime2-2022.2
+
+
+PAIRED END DEMULTIPLEX IMPORT
+$ qiime tools import \
+  --type EMPPairedEndSequences \
+  --input-path ~Claire/Documents/EAGER_Seq/FRfiles \
+  --output-path EAGER16Smultiplexed-seqs.qza
+
+
+$ qiime demux emp-paired \
+  --m-barcodes-file 220216_Hess_16sFWD_220215.txt \
+  --m-barcodes-column Barcode \
+  --i-seqs EAGER16Smultiplexed-seqs.qza \
+  --p-no-golay-error-correction \
+  --o-per-sample-sequences EAGER16Sdemux-full.qza \
+  --o-error-correction-details EAGER16Sdemux-details.qza
+
+$ qiime demux summarize \
+  --i-data EAGER16Sdemux-full.qza \
+  --o-visualization EAGER16Sdemultiplexed-seqs.qzv
+
+
+DADA2 DENOISE *rate limiting step, 12hrs
+$ qiime dada2 denoise-paired \
+ --i-demultiplexed-seqs EAGER16Sdemux-full.qza \
+ --p-trim-left-f 20 \
+ --p-trim-left-r 20 \
+ --p-trunc-len-f 220 \
+ --p-trunc-len-r 220 \
+ --o-table EAGER16Stable.qza \
+ --o-representative-sequences EAGER16Srep-seqs.qza \
+ --o-denoising-stats EAGER16Sdenoising-stats.qza \
+ --verbose
+ 
+
+DADA2 STATS
+$ qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file sample-metadata.tsv
+
+$ qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+$ qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv
+
+
+$ qiime phylogeny align-to-tree-mafft-fasttree \
+ --i-sequences EAGER16Srep-seqs.qza \
+ --o-alignment EAGER16Saligned-rep-seqs.qza \
+ --o-masked-alignment EAGER16Smasked-aligned-rep-seqs.qza \
+ --o-tree EAGER16Sunrooted-tree.qza \
+ --o-rooted-tree EAGER16Srooted-tree.qza
+
+ALPHA and BETA DIVERSITY ANALYSIS
+$ qiime diversity core-metrics-phylogenetic \
+ --i-phylogeny EAGER16Srooted-tree.qza \
+ --i-table EAGER16Stable.qza \
+ --p-sampling-depth 100 \
+ --m-metadata-file EAGERmetadata.tsv \
+ --output-dir core-metrics-results2
+
+$ qiime diversity alpha-group-significance \
+ --i-alpha-diversity core-metrics-results2/EAGER16Sfaith_pd_vector.qza \
+ --m-metadata-file EAGERmetadata.tsv \
+ --o-visualization core-metrics-results2/EAGER16Sfaith-pd-group-significance.qzv 
+
+$ qiime diversity alpha-group-significance \
+ --i-alpha-diversity core-metrics-results2/EAGER16Sevenness_vector.qza \
+ --m-metadata-file EAGERmetadata.tsv \
+ --o-visualization core-metrics-results2/EAGER16sevenness-group-significance.qzv
+
+FEATURE TABLE
+$ qiime feature-table tabulate-seqs \
+--i-data rep-seqs.qza \
+--o-visualization EAGER16Srep-seqs.qzv
+
+TAXONOMIC ASSIGNMENT
+$ qiime feature-classifier classify-sklearn \
+  --i-classifier silva-138-99-515-806-nb-classifier.qza \
+  --i-reads EAGER16Srep-seqs.qza \
+  --o-classification EAGER16Staxonomy.qza
+*May need to update classifier from qiime2
+
+$ qiime metadata tabulate \
+  --m-input-file EAGER16Staxonomy.qza \
+  --o-visualization EAGER16Staxonomy.qzv
+
+$ qiime taxa barplot \
+  --i-table EAGER16Stable.qza \
+  --i-taxonomy EAGER16Staxonomy.qza \
+  --m-metadata-file EAGERmetadata.tsv  \
+  --o-visualization EAGER16Staxa-bar-plots.qzv
